@@ -25,7 +25,7 @@ pip install datnvt-cvat-cli
 Or from source:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/datvtn/datnvt-cvat-cli.git
 cd datnvt-cvat-cli
 pip install -e .
 ```

@@ -7,7 +7,7 @@ name = "datnvt-cvat-cli"
 version = "0.1.0"
 description = "CLI and Python API for managing CVAT annotations: download, upload, and inspect tasks"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.9"
 keywords = ["cvat", "annotations", "computer-vision", "cli", "dataset"]
 authors = [{ name = "datnvt", email = "thanhdatnv2712@gmail.com" }]
@@ -15,7 +15,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",

@@ -539,6 +539,13 @@ def run(
             console=console,
         )
 
+    # Suppress INFO/WARNING from the package logger; progress bar is the visual feedback
+    _pkg_logger = logging.getLogger("datnvt_cvat_cli")
+    _pkg_logger.setLevel(logging.ERROR)
+
+    # Collect per-operation results for the final summary
+    results: list[dict] = []
+
     for entry in configs:
         task_name = entry.get("task", "")
         canonical = _TASK_ALIASES.get(task_name, task_name)
@@ -549,9 +556,12 @@ def run(
         try:
             fmt = DatasetFormat(fmt_str)
         except ValueError:
-            logger.error("Unknown format '%s' in task '%s'", fmt_str, task_name)
+            console.print(f"[red]Unknown format '{fmt_str}' in '{task_name}'[/red]")
             continue
 
+        n_done = 0
+        n_skipped = 0
+        warnings: list[tuple[int, str]] = []
         errors: list[tuple[int, str]] = []
 
         if canonical == "download":
@@ -559,7 +569,7 @@ def run(
             out_dir = params.get("out_dir")
             out_paths_raw = params.get("out_paths")
             if not out_dir and not out_paths_raw:
-                logger.error("Task '%s': provide out_dir or out_paths", task_name)
+                console.print(f"[red]'{task_name}':[/red] provide out_dir or out_paths")
                 continue
             folder_prefix: str = params.get("folder_prefix", "task")
             paths = (
@@ -576,11 +586,12 @@ def run(
                 for tid, dest in zip(task_ids, paths):
                     progress.update(bar, description=f"task {tid}")
                     if skip_existing and client._has_annotations(dest, fmt):
-                        logger.debug("Task %s: already exists, skipping", tid)
+                        n_skipped += 1
                         progress.advance(bar)
                         continue
                     try:
                         client.download_annotations(tid, dest, fmt, save_images)
+                        n_done += 1
                     except Exception as exc:
                         errors.append((tid, str(exc)))
                     progress.advance(bar)
@@ -595,20 +606,22 @@ def run(
                         tid = item.get("task_id")
                         anno_path = item.get("annotation_path")
                         if tid is None or not anno_path:
-                            errors.append((tid or 0, "missing task_id or annotation_path"))
+                            warnings.append((tid or 0, "missing task_id or annotation_path"))
                             progress.advance(bar)
                             continue
                         item_fmt_str = item.get("dataset_format", fmt_str)
                         try:
                             item_fmt = DatasetFormat(item_fmt_str)
                         except ValueError:
-                            errors.append((int(tid), f"unknown format '{item_fmt_str}'"))
+                            warnings.append((int(tid), f"unknown format '{item_fmt_str}'"))
                             progress.advance(bar)
                             continue
                         progress.update(bar, description=f"task {tid}")
                         try:
                             ok = client.upload_annotations(int(tid), Path(anno_path), item_fmt)
-                            if not ok:
+                            if ok:
+                                n_done += 1
+                            else:
                                 errors.append((int(tid), "upload returned failure"))
                         except Exception as exc:
                             errors.append((int(tid), str(exc)))
@@ -635,12 +648,14 @@ def run(
                         )
                         anno_file = next((c for c in candidates if c.exists()), None)
                         if anno_file is None:
-                            errors.append((tid, f"no annotation file in {task_dir}"))
+                            warnings.append((tid, f"no annotation file in {task_dir}"))
                             progress.advance(bar)
                             continue
                         try:
                             ok = client.upload_annotations(tid, anno_file, fmt)
-                            if not ok:
+                            if ok:
+                                n_done += 1
+                            else:
                                 errors.append((tid, "upload returned failure"))
                         except Exception as exc:
                             errors.append((tid, str(exc)))
@@ -649,14 +664,45 @@ def run(
             console.print(f"[yellow]Unknown task:[/yellow] '{task_name}', skipping.")
             continue
 
-        if errors:
-            console.print(f"  [red]✗ {len(errors)} task(s) failed:[/red]")
-            for tid, err in errors:
-                logger.error("task %s: %s", tid, err)
-        else:
-            logger.info("%s — all tasks completed", canonical)
+        results.append(
+            {
+                "op": canonical,
+                "done": n_done,
+                "skipped": n_skipped,
+                "warnings": warnings,
+                "errors": errors,
+            }
+        )
 
-    console.print("[green]All done.[/green]")
+    # ── Summary ────────────────────────────────────────────────────────────
+    console.print()
+    console.print("[bold]─── Summary ───[/bold]")
+    all_warnings: list[tuple[str, int, str]] = []
+    all_errors: list[tuple[str, int, str]] = []
+
+    for r in results:
+        parts = [f"[green]✓ {r['done']} done[/green]"]
+        if r["skipped"]:
+            parts.append(f"[dim]⏭ {r['skipped']} skipped[/dim]")
+        if r["warnings"]:
+            parts.append(f"[yellow]⚠ {len(r['warnings'])} warning(s)[/yellow]")
+        if r["errors"]:
+            parts.append(f"[red]✗ {len(r['errors'])} failed[/red]")
+        console.print(f"  [bold]{r['op']}[/bold]  " + "  ".join(parts))
+        all_warnings.extend((r["op"], tid, msg) for tid, msg in r["warnings"])
+        all_errors.extend((r["op"], tid, msg) for tid, msg in r["errors"])
+
+    if all_warnings:
+        console.print()
+        console.print("[yellow]Warnings:[/yellow]")
+        for op, tid, msg in all_warnings:
+            console.print(f"  [yellow]⚠[/yellow]  {op} › task {tid}: {msg}")
+
+    if all_errors:
+        console.print()
+        console.print("[red]Errors:[/red]")
+        for op, tid, msg in all_errors:
+            console.print(f"  [red]✗[/red]  {op} › task {tid}: {msg}")
 
 
 def main_cli() -> None:

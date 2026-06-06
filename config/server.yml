@@ -1,0 +1,8 @@
+# CVAT server credentials
+# Usage: datnvt-cvat-cli --config config/server.yml <command>
+# WARNING: contains credentials — do NOT commit this file to git
+
+url: "https://cvat.example.com"
+username: "myuser"
+password: "mypassword"
+project_id: 11

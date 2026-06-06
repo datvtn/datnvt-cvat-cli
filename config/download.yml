@@ -1,0 +1,24 @@
+# Download annotations (and optionally images) from CVAT tasks
+# Usage: datnvt-cvat-cli --config config/server.yml run config/download.yml
+
+- task: download_cvat_tasks
+  parameters:
+    # List of CVAT task IDs to download
+    task_ids: [147, 150, 151]
+
+    # Output directory — each task is saved under <out_dir>/task{id}/
+    out_dir: data/raw
+
+    # Annotation format: "CVAT for images 1.1" (XML) or "COCO 1.0" (JSON)
+    dataset_format: "CVAT for images 1.1"
+
+    # Set true to also download raw image files alongside annotations
+    save_images: false
+
+    # Set false to force re-download even when files already exist on disk
+    skip_existing: true
+
+    # Optional: rename output folders using a custom prefix instead of "task".
+    # Default produces task147/, task150/, ...
+    # Set "data_" to get data_147/, data_150/, ...
+    # folder_prefix: "data_"

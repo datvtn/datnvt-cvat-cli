@@ -1,0 +1,20 @@
+# Upload annotation files to CVAT tasks
+# Usage: datnvt-cvat-cli --config config/server.yml run config/upload.yml
+
+- task: upload_anno_with_cvat_tasks
+  parameters:
+    # Default annotation format for all tasks below
+    # Can be overridden per task with a "dataset_format" key
+    dataset_format: "CVAT for images 1.1"   # "CVAT for images 1.1" or "COCO 1.0"
+
+    tasks:
+      - task_id: 147
+        annotation_path: data/processed/task147_annotations.json
+
+      - task_id: 150
+        annotation_path: data/processed/task150_annotations.json
+
+      # Example: override format for a single task
+      # - task_id: 151
+      #   annotation_path: data/processed/task151_annotations.xml
+      #   dataset_format: "CVAT for images 1.1"
